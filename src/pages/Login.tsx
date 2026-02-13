@@ -51,8 +51,6 @@ const response = await fetch(`${API_URL}/api/login`, {
 localStorage.setItem("token", data.token);
 localStorage.setItem("role", data.role);
 
-// Navigate to dashboard
-navigate("/dashboard");
 
       toast({
         title: "Login successful",
