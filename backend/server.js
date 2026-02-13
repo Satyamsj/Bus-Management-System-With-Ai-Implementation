@@ -1,40 +1,46 @@
 const express = require("express");
-const { Pool } = require("pg");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
 const cors = require("cors");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const { Pool } = require("pg");
 
 const app = express();
-app.use(express.json());
 app.use(cors());
+app.use(express.json());
 
-// PostgreSQL connection
+// PostgreSQL Connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
-pool.connect()
-  .then(() => console.log("PostgreSQL Connected!"))
-  .catch(err => console.error("DB Connection Error", err));
-
-const SECRET = process.env.JWT_SECRET || "ROUTEAI_SECRET_KEY";
-
-// REGISTER
-app.post("/api/register", async (req, res) => {
-  const { name, email, password, role } = req.body;
-
-  if (!name || !email || !password || !role)
-    return res.status(400).json({ message: "All fields required" });
-
+// Create Users Table Automatically
+const createUsersTable = async () => {
   try {
-    const userCheck = await pool.query(
-      "SELECT * FROM users WHERE email = $1",
-      [email]
-    );
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        email VARCHAR(100) UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("Users table ready");
+  } catch (err) {
+    console.error("Error creating users table:", err);
+  }
+};
 
-    if (userCheck.rows.length > 0)
-      return res.status(400).json({ message: "Email already exists" });
+createUsersTable();
+
+// Register API
+app.post("/api/register", async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -43,47 +49,55 @@ app.post("/api/register", async (req, res) => {
       [name, email, hashedPassword, role]
     );
 
-    res.json({ message: "User registered successfully" });
+    res.status(201).json({ message: "User registered successfully" });
   } catch (err) {
-    res.status(500).json({ message: "DB error", err });
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-// LOGIN
+// Login API
 app.post("/api/login", async (req, res) => {
-  const { email, password } = req.body;
-
   try {
+    const { email, password } = req.body;
+
     const result = await pool.query(
       "SELECT * FROM users WHERE email = $1",
       [email]
     );
 
-    if (result.rows.length === 0)
-      return res.status(400).json({ message: "Invalid email or password" });
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: "User not found" });
+    }
 
     const user = result.rows[0];
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(400).json({ message: "Incorrect password" });
+    const validPassword = await bcrypt.compare(password, user.password);
+
+    if (!validPassword) {
+      return res.status(400).json({ error: "Invalid password" });
+    }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      SECRET,
-      { expiresIn: "7d" }
+      { id: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
     );
 
-    res.json({
-      message: "Login successful",
-      token,
-      role: user.role,
-    });
+    res.json({ token, role: user.role });
   } catch (err) {
-    res.status(500).json({ message: "Server error", err });
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-// START SERVER
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Test Route
+app.get("/", (req, res) => {
+  res.send("RouteAI Backend Running 🚀");
+});
+
+const PORT = process.env.PORT || 10000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
