@@ -50,12 +50,17 @@ const Register = () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL;
 
-const response = await fetch(`${API_URL}/api/login`, {
+const response = await fetch(`${API_URL}/api/register`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: formData.name,
+    email: formData.email,
+    password: formData.password,
+    role: formData.role,
+  }),
+});
 
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
 
       const data = await response.json();
 
