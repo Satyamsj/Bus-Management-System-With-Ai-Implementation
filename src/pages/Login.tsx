@@ -38,18 +38,21 @@ const response = await fetch(`${API_URL}/api/login`, {
       const data = await response.json();
 
       if (!response.ok) {
-        toast({
-          title: "Login Failed",
-          description: data.message,
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
+  toast({
+    title: "Login Failed",
+    description: data.error, 
+    variant: "destructive",
+  });
+  setIsLoading(false);
+  return;
+}
 
-      // Store JWT + role
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("role", data.role);
+// Store JWT + role
+localStorage.setItem("token", data.token);
+localStorage.setItem("role", data.role);
+
+// Navigate to dashboard
+navigate("/Dashboard");
 
       toast({
         title: "Login successful",
