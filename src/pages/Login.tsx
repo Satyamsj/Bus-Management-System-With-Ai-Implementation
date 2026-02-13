@@ -26,7 +26,10 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://192.168.56.1:5000/api/login", {
+      const API_URL = import.meta.env.VITE_API_URL;
+
+const response = await fetch(`${API_URL}/api/login`, {
+
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
