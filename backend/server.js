@@ -6,7 +6,7 @@ const { Pool } = require("pg");
 
 const app = express();
 app.use(cors({
-  origin: "https://bus-management-system-with-ai-imple.vercel.app/", // replace with your frontend URL
+  origin: "https://bus-management-system-with-ai-imple.vercel.app/", 
   methods: ["GET","POST","PUT","DELETE"],
   credentials: true
 }));
