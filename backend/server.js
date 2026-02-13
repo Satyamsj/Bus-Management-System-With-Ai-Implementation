@@ -5,7 +5,12 @@ const jwt = require("jsonwebtoken");
 const { Pool } = require("pg");
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: "https://your-frontend-domain.com", // replace with your frontend URL
+  methods: ["GET","POST","PUT","DELETE"],
+  credentials: true
+}));
+
 app.use(express.json());
 
 // PostgreSQL Connection
