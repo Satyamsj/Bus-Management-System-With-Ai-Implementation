@@ -48,18 +48,14 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-     const API_URL = "https://routeai-backend.onrender.com";
+    const API_URL = import.meta.env.VITE_API_URL;
 
-const response = await fetch(`${API_URL}/api/register`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    name: formData.name,
-    email: formData.email,
-    password: formData.password,
-    role: formData.role,
-  }),
+const response = await fetch(`${API_URL}/api/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password })
 });
+
 
 
       const data = await response.json();
