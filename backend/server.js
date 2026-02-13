@@ -1,5 +1,5 @@
 const express = require("express");
-const mysql = require("mysql2");
+const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
@@ -8,89 +8,82 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-//  MySQL CONNECTION
-
-const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "9826",
-  database: "routeai",
+// PostgreSQL connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
 });
 
-db.connect((err) => {
-  if (err) throw err;
-  console.log("MySQL Connected!");
-});
+pool.connect()
+  .then(() => console.log("PostgreSQL Connected!"))
+  .catch(err => console.error("DB Connection Error", err));
 
-// JWT Secret
-const SECRET = "ROUTEAI_SECRET_KEY";
+const SECRET = process.env.JWT_SECRET || "ROUTEAI_SECRET_KEY";
 
-//  REGISTER USER
-
-app.post("/api/register", (req, res) => {
+// REGISTER
+app.post("/api/register", async (req, res) => {
   const { name, email, password, role } = req.body;
 
   if (!name || !email || !password || !role)
     return res.status(400).json({ message: "All fields required" });
 
-  // Check if user exists
-  db.query(
-    "SELECT * FROM users WHERE email = ?",
-    [email],
-    async (err, result) => {
-      if (result.length > 0) {
-        return res.status(400).json({ message: "Email already exists" });
-      }
+  try {
+    const userCheck = await pool.query(
+      "SELECT * FROM users WHERE email = $1",
+      [email]
+    );
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+    if (userCheck.rows.length > 0)
+      return res.status(400).json({ message: "Email already exists" });
 
-      const sql =
-        "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)";
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-      db.query(sql, [name, email, hashedPassword, role], (err, result) => {
-        if (err) return res.status(500).json({ message: "DB error", err });
-        res.json({ message: "User registered successfully" });
-      });
-    }
-  );
+    await pool.query(
+      "INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4)",
+      [name, email, hashedPassword, role]
+    );
+
+    res.json({ message: "User registered successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "DB error", err });
+  }
 });
 
-
-//  LOGIN USER
-app.post("/api/login", (req, res) => {
+// LOGIN
+app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
 
-  db.query(
-    "SELECT * FROM users WHERE email = ?",
-    [email],
-    async (err, result) => {
-      if (result.length === 0) {
-        return res.status(400).json({ message: "Invalid email or password" });
-      }
+  try {
+    const result = await pool.query(
+      "SELECT * FROM users WHERE email = $1",
+      [email]
+    );
 
-      const user = result[0];
+    if (result.rows.length === 0)
+      return res.status(400).json({ message: "Invalid email or password" });
 
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch)
-        return res.status(400).json({ message: "Incorrect password" });
+    const user = result.rows[0];
 
-      // Create token
-      const token = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
-        SECRET,
-        { expiresIn: "7d" }
-      );
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch)
+      return res.status(400).json({ message: "Incorrect password" });
 
-      res.json({
-        message: "Login successful",
-        token,
-        role: user.role,
-      });
-    }
-  );
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      message: "Login successful",
+      token,
+      role: user.role,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", err });
+  }
 });
-//  SERVER START
 
+// START SERVER
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
